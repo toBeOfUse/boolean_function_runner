@@ -46,8 +46,8 @@ class Expression:
                     (is_literal or token == ")" or token == ")'") and
                     i != len(tokens)-1
             ):
-                # if we're currently looking at a literal or close-parentheses
-                # and the next token is a literal or open-parentheses, insert
+                # if we're currently looking at a literal or close-parenthesis
+                # and the next token is a literal or open-parenthesis, insert
                 # the implicit "and"
                 next_token = tokens[i+1]
                 if (
@@ -62,14 +62,17 @@ class Expression:
         
         self.log.debug(f"derived python expression: {self.expr}")
         self.log.debug(f"collected variables: {self.literals}")
+
+        # note: internal state of Expression object should never change after
+        # construction
     
     @staticmethod
     def get_values_string(values: dict[str, bool]) -> str:
         return ', '.join([f'{x}={y}' for x, y in values.items()])
     
     def first_difference(self, other: "Expression") -> str:
-        #TODO: test. also: refactor so that temporary truth tables aren't being
-        #potentially expensively made and then thrown away?
+        # TODO: refactor so that temporary truth tables aren't being potentially
+        # expensively made and then thrown away? same as __eq__
         bits = TruthTable(self).first_difference(TruthTable(other))
         if bits is None:
             return "expressions are equal"
@@ -92,13 +95,13 @@ class Expression:
         return result
     
     def __eq__(self, other: "Expression") -> bool:
-        #TODO: refactor so that temporary truth tables aren't being
-        #potentially expensively made and then thrown away?
+        # TODO: refactor so that temporary truth tables aren't being potentially
+        # expensively made and then thrown away? same as first_difference
         return TruthTable(self) == TruthTable(other)
 
 class TruthTable:
     def __init__(self, expr: Expression):
-        self.expr = Expression(expr.raw_string)  # defensive copy
+        self.expr = expr
         self.states: dict[str, bool] = {}
         for i in range(self.states_count):
             bits = bin(i)[2:]
@@ -107,6 +110,9 @@ class TruthTable:
             for i, literal in enumerate(expr.literals):
                 values[literal] = bool(int(bits[i]))
             self.states[bits] = expr.evaluate(values)
+        
+        # note: internal state of TruthTable should not change after
+        # construction
     
     @property
     def states_count(self):
