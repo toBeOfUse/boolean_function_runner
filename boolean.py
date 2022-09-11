@@ -7,33 +7,54 @@ class Expression:
         raw_string = raw_string.replace('’', "'")
         self.raw_string = raw_string
         literal_re = re.compile(r"[A-Za-z]\'?")
-        # TODO: ability to prime paranthesized groups. add )' case to regex,
-        # deal with by going backward to ( on same level and inserting a "not"
-        # before it
-        token_re = re.compile(literal_re.pattern + r"|\*|\.|\+|\(|\)")
+        token_re = re.compile(literal_re.pattern + r"|\*|\.|\+|\(|\)\'|\)")
         tokens = token_re.findall(raw_string)
         literals = set()
         self.log.debug(f"parsing raw expression: {raw_string}")
         self.log.debug(f"extracted raw tokens: {tokens}")
         processed_tokens = []
         for i, token in enumerate(tokens):
-            if literal_re.match(token) is not None:
+            is_literal = literal_re.match(token) is not None
+            if is_literal:
                 if len(token) == 2:
-                    processed_tokens.append(f"(not {token[0]})")
-                else:
-                    processed_tokens.append(token)
-                if (
-                    i != len(tokens)-1 and 
-                    literal_re.match(tokens[i+1]) is not None
-                ):
-                    processed_tokens.append(f"and")
+                    processed_tokens.append("not")
+                processed_tokens.append(token[0])
                 literals.add(token[0])
+            elif token == ")'":
+                # deal with an inverted parenthesized group by going back to the
+                # beginning of the group and putting "not" in front of it
+                processed_tokens.append(")")
+                pos = len(processed_tokens)-1
+                level = 0
+                while True:
+                    past_token = processed_tokens[pos]
+                    if past_token == ")":
+                        level += 1
+                    elif past_token == "(":
+                        level -= 1
+                    if level == 0:
+                        processed_tokens.insert(pos, "not")
+                        break
+                    pos -= 1
             elif token == "*" or token == ".":
                 processed_tokens.append("and")
             elif token == "+":
                 processed_tokens.append("or")
             else:
                 processed_tokens.append(token)
+            if (
+                    (is_literal or token == ")" or token == ")'") and
+                    i != len(tokens)-1
+            ):
+                # if we're currently looking at a literal or close-parentheses
+                # and the next token is a literal or open-parentheses, insert
+                # the implicit "and"
+                next_token = tokens[i+1]
+                if (
+                    literal_re.match(next_token) is not None or
+                    next_token == "("
+                ):
+                    processed_tokens.append(f"and")
             
         self.expr = " ".join(processed_tokens)
         self.compiled_expr = compile(self.expr, "<string>", "eval")
