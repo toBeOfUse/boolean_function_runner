@@ -64,16 +64,22 @@ class Expression:
         self.log.debug(f"collected variables: {self.literals}")
 
         # note: internal state of Expression object should never change after
-        # construction
+        # construction, except for the TruthTable cache below
+
+        self._truth_table: TruthTable | None = None
+    
+    def truth_table(self) -> "TruthTable":
+        if self._truth_table is None:
+            self._truth_table = TruthTable(self)
+        return self._truth_table
+
     
     @staticmethod
     def get_values_string(values: dict[str, bool]) -> str:
         return ', '.join([f'{x}={y}' for x, y in values.items()])
     
     def first_difference(self, other: "Expression") -> str:
-        # TODO: refactor so that temporary truth tables aren't being potentially
-        # expensively made and then thrown away? same as __eq__
-        bits = TruthTable(self).first_difference(TruthTable(other))
+        bits = self.truth_table().first_difference(other.truth_table())
         if bits is None:
             return "expressions are equal"
         values = {}
@@ -95,9 +101,7 @@ class Expression:
         return result
     
     def __eq__(self, other: "Expression") -> bool:
-        # TODO: refactor so that temporary truth tables aren't being potentially
-        # expensively made and then thrown away? same as first_difference
-        return TruthTable(self) == TruthTable(other)
+        return self.truth_table() == other.truth_table()
 
 class TruthTable:
     def __init__(self, expr: Expression):
